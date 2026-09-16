@@ -1,0 +1,12 @@
+[
+  {
+    "id": "demo-project",
+    "title": "Exemple — supprime-moi",
+    "description": "Ceci est une fiche de démonstration pour te montrer le format d'un projet : titre, description, technologies et fichiers joints.",
+    "tags": ["Exemple"],
+    "date": "",
+    "link": "",
+    "createdAt": 1726358400000,
+    "files": []
+  }
+]

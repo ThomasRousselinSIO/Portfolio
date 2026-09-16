@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thomas — Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+
+<!-- fond calque -->
+<div class="blueprint-grid" aria-hidden="true"></div>
+
+<header class="site-header">
+  <a href="#top" class="brand">
+    <span class="brand-mark" aria-label="Thomas Rousselin">TR<i aria-hidden="true"></i></span>
+  </a>
+  <nav class="site-nav">
+    <a href="#projets">Projets</a>
+    <a href="#apropos">À propos</a>
+    <a href="#contact">Contact</a>
+  </nav>
+  <button class="btn-add-nav" data-open-modal>
+    <span class="plus">+</span> Nouveau projet
+  </button>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero" id="hero">
+    <div class="hero-inner">
+      <p class="hero-eyebrow">BTS SIO — option SLAM</p>
+      <h1 class="hero-title">
+        <span class="line name-highlight" data-reveal>Thomas Rousselin</span>
+      </h1>
+      <p class="hero-desc">
+        Développement web &amp; mobile, conception logicielle, bases de données.
+        Ce portfolio grandit à chaque nouveau projet déposé — ci-dessous.
+      </p>
+      <div class="hero-actions">
+        <a href="#projets" class="btn-primary">Voir les projets</a>
+        <a href="#apropos" class="btn-ghost">En savoir plus</a>
+      </div>
+    </div>
+
+    <!-- cartouche façon fenêtre de code -->
+    <div class="title-block" aria-hidden="true">
+      <div class="cw-bar">
+        <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+        <span class="cw-filename">profil.json</span>
+      </div>
+      <pre class="cw-body"><code><span class="tok-brace">{</span>
+  <span class="tok-key">dessiné_par</span>: <span class="tok-str">Thomas</span>,
+  <span class="tok-key">formation</span>: <span class="tok-str">BTS SIO - SLAM</span>,
+  <span class="tok-key">n_planche</span>: <span class="tok-str" id="tb-count">001</span>,
+  <span class="tok-key">échelle</span>: <span class="tok-str">1:1</span>,
+  <span class="tok-key">date</span>: <span class="tok-str" id="tb-date"></span>
+<span class="tok-brace">}</span></code></pre>
+    </div>
+  </section>
+
+  <!-- A PROPOS -->
+  <section class="about" id="apropos">
+    <div class="about-grid">
+      <div class="about-text">
+        <h2>À propos</h2>
+        <p>
+          Étudiant en première année de BTS SIO, option SLAM (Solutions Logicielles
+          et Applications Métier), je travaille sur le développement d'applications
+          web et mobile, la conception logicielle et la gestion de bases de données.
+        </p>
+        <p>
+          Chaque ligne de ce portfolio est un projet réel, déposé au fur et à mesure
+          — code, documents, PDF de spécifications ou de soutenance.
+        </p>
+      </div>
+      <ul class="specs">
+        <li><span>Langages</span><strong>HTML · CSS · JS · Java · PHP · SQL</strong></li>
+        <li><span>Conception</span><strong>UML · Maquettage</strong></li>
+        <li><span>Bases de données</span><strong>MySQL</strong></li>
+        <li><span>Outils</span><strong>Git · VS Code · WampServer</strong></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- PROJETS -->
+  <section class="projects" id="projets">
+    <div class="projects-head">
+      <h2>Projets</h2>
+      <div class="projects-controls">
+        <input type="search" id="search-input" placeholder="Rechercher un projet…" aria-label="Rechercher un projet">
+        <select id="tag-filter" aria-label="Filtrer par technologie">
+          <option value="">Toutes les technos</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="projects-grid" id="projects-grid">
+      <!-- injecté en JS -->
+    </div>
+
+    <div class="empty-state" id="empty-state" hidden>
+      <p>Aucun projet ne correspond à cette recherche.</p>
+    </div>
+
+    <button class="add-card" data-open-modal>
+      <span class="plus-big">+</span>
+      <span>Déposer un nouveau projet</span>
+    </button>
+  </section>
+
+</main>
+
+<footer class="site-footer" id="contact">
+  <div>
+    <p class="footer-title">On en parle ?</p>
+    <p class="footer-sub">Ouvert aux stages, alternances et collaborations.</p>
+  </div>
+  <div class="footer-links">
+    <a href="mailto:thomasbtssiosisr@gmail.com">thomasbtssiosisr@gmail.com</a>
+    <a href="https://github.com/ThomasRousselinSIO" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://www.linkedin.com/in/thomas-rousselin-2b683839b/" target="_blank" rel="noopener">LinkedIn</a>
+  </div>
+  <span class="brand-sub">rev.02</span>
+</footer>
+
+<!-- MODAL : AJOUT / EDITION DE PROJET -->
+<div class="modal-overlay" id="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <h3 id="modal-title">Nouveau projet</h3>
+      <button class="modal-close" id="modal-close" aria-label="Fermer">✕</button>
+    </div>
+
+    <form id="project-form" class="project-form">
+      <input type="hidden" id="project-id">
+
+      <label class="field">
+        <span>Titre du projet</span>
+        <input type="text" id="f-title" required placeholder="Ex. Gestionnaire de stock">
+      </label>
+
+      <label class="field">
+        <span>Description</span>
+        <textarea id="f-desc" rows="4" required placeholder="En quelques phrases : le contexte, ton rôle, ce que ça fait."></textarea>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span>Technologies (séparées par des virgules)</span>
+          <input type="text" id="f-tags" placeholder="Java, MySQL, JavaFX">
+        </label>
+        <label class="field">
+          <span>Date</span>
+          <input type="month" id="f-date">
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Lien externe (dépôt, démo…) — optionnel</span>
+        <input type="url" id="f-link" placeholder="https://github.com/...">
+      </label>
+
+      <label class="field">
+        <span>Fichiers du projet</span>
+        <span class="field-hint">PDF, code source (tous langages), zip, images… ce que tu veux joindre.</span>
+        <div class="dropzone" id="dropzone" tabindex="0">
+          <p><strong>Glisse tes fichiers ici</strong> ou clique pour parcourir</p>
+          <input type="file" id="f-files" multiple hidden>
+        </div>
+        <ul class="file-list" id="file-list"></ul>
+      </label>
+
+      <div class="form-actions">
+        <button type="button" class="btn-ghost" id="btn-cancel">Annuler</button>
+        <button type="submit" class="btn-primary">Enregistrer le projet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL : DETAIL PROJET -->
+<div class="modal-overlay" id="detail-overlay" hidden>
+  <div class="modal modal-detail" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h3 id="detail-title"></h3>
+      <button class="modal-close" id="detail-close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="detail-meta">
+      <span id="detail-date"></span>
+      <a id="detail-link" href="#" target="_blank" rel="noopener" hidden>Lien externe ↗</a>
+    </div>
+    <div class="detail-tags" id="detail-tags"></div>
+    <p class="detail-desc" id="detail-desc"></p>
+    <div class="detail-files">
+      <h4>Fichiers joints</h4>
+      <ul id="detail-file-list"></ul>
+    </div>
+    <div class="detail-actions">
+      <button class="btn-ghost" id="detail-edit">Modifier</button>
+      <button class="btn-danger" id="detail-delete">Supprimer le projet</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<!-- MODAL : ACCES ADMINISTRATEUR -->
+<div class="modal-overlay" id="admin-overlay" hidden>
+  <div class="modal modal-admin" role="dialog" aria-modal="true" aria-labelledby="admin-title">
+    <div class="modal-head">
+      <h3 id="admin-title">Accès administrateur</h3>
+      <button class="modal-close" id="admin-close" type="button" aria-label="Fermer">✕</button>
+    </div>
+    <form id="admin-form" class="project-form">
+      <label class="field">
+        <span>Mot de passe</span>
+        <input type="password" id="admin-password" required autocomplete="current-password">
+      </label>
+      <div class="form-actions">
+        <button type="button" class="btn-ghost" id="admin-cancel">Annuler</button>
+        <button type="submit" class="btn-primary">Continuer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js?v=3"></script>
+</body>
+</html>
