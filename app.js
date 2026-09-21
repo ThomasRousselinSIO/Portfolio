@@ -250,6 +250,61 @@ function extOf(name) {
   return parts.length > 1 ? parts.pop().toUpperCase() : "FILE";
 }
 
+function buildFileTree(files) {
+  const root = { folders: new Map(), files: [] };
+
+  files.forEach((file) => {
+    const parts = (file.path || file.name).split(/[\\/]/).filter(Boolean);
+    const fileName = parts.pop() || file.name;
+    let branch = root;
+
+    parts.forEach((folderName) => {
+      if (!branch.folders.has(folderName)) {
+        branch.folders.set(folderName, { folders: new Map(), files: [] });
+      }
+      branch = branch.folders.get(folderName);
+    });
+
+    branch.files.push({ ...file, name: fileName });
+  });
+
+  return root;
+}
+
+function renderFileTree(branch, parent, isRoot = true) {
+  [...branch.folders.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([folderName, folder]) => {
+    const details = document.createElement("details");
+    details.className = "file-tree-folder";
+    details.open = isRoot;
+
+    const summary = document.createElement("summary");
+    summary.innerHTML = `<span class="tree-folder-icon">▸</span><span>${escapeHTML(folderName)}</span>`;
+    details.appendChild(summary);
+
+    const contents = document.createElement("div");
+    contents.className = "file-tree-contents";
+    renderFileTree(folder, contents, false);
+    details.appendChild(contents);
+    parent.appendChild(details);
+  });
+
+  branch.files.sort((a, b) => a.name.localeCompare(b.name)).forEach((file) => {
+    const row = document.createElement("div");
+    row.className = "file-tree-file";
+    row.innerHTML = `
+      <span class="df-name"><span class="df-ext">${escapeHTML(extOf(file.name))}</span><span class="df-file-name">${escapeHTML(file.name)}</span><span class="df-size">${humanSize(file.size)}</span></span>
+    `;
+
+    const download = document.createElement("a");
+    download.className = "df-download";
+    download.href = file.url;
+    download.download = file.name;
+    download.textContent = "Télécharger";
+    row.appendChild(download);
+    parent.appendChild(row);
+  });
+}
+
 function formatMonth(value) {
   if (!value) return "";
   const [y, m] = value.split("-");
@@ -562,19 +617,11 @@ async function openDetail(id) {
 
   const fileList = document.getElementById("detail-file-list");
   fileList.innerHTML = "";
+  fileList.className = "file-tree";
   if (project.files.length === 0) {
     fileList.innerHTML = `<li><span class="df-name">Aucun fichier joint</span></li>`;
   } else {
-    project.files.forEach((f) => {
-      const url = f.url;
-      const displayPath = f.path || f.name;
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <span class="df-name"><span class="df-ext">${extOf(f.name)}</span> ${escapeHTML(displayPath)} <span class="df-size">${humanSize(f.size)}</span></span>
-        <a class="df-download" href="${url}" download="${escapeHTML(f.name)}">Télécharger</a>
-      `;
-      fileList.appendChild(li);
-    });
+    renderFileTree(buildFileTree(project.files), fileList);
   }
 
   detailOverlay.hidden = false;
@@ -588,6 +635,44 @@ function closeDetail() {
 document.getElementById("detail-close").addEventListener("click", closeDetail);
 detailOverlay.addEventListener("click", (e) => {
   if (e.target === detailOverlay) closeDetail();
+});
+
+document.getElementById("detail-download-all").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const project = await getProject(currentDetailId);
+  if (!project || project.files.length === 0) {
+    showToast("Aucun fichier à télécharger.");
+    return;
+  }
+  if (!window.JSZip) {
+    showToast("Le téléchargement groupé est indisponible.");
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Préparation…";
+  try {
+    const archive = new window.JSZip();
+    for (const file of project.files) {
+      const response = await fetch(file.url);
+      if (!response.ok) throw new Error(`Impossible de récupérer ${file.name}.`);
+      archive.file(file.path || file.name, await response.blob());
+    }
+
+    const blob = await archive.generateAsync({ type: "blob" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `${project.title || "projet"}.zip`.replace(/[^A-Za-z0-9._-]/g, "_");
+    link.click();
+    URL.revokeObjectURL(downloadUrl);
+    showToast("Archive téléchargée.");
+  } catch (error) {
+    showToast(error.message || "Impossible de créer l’archive.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Télécharger tout";
+  }
 });
 
 document.getElementById("detail-edit").addEventListener("click", async () => {

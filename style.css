@@ -666,7 +666,7 @@ input[type=month]{ color-scheme: dark; }
 .detail-tags{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .detail-desc{ color: var(--ink-soft); white-space: pre-wrap; margin-bottom: 24px; }
 .detail-files h4{ font-size: .95rem; margin-bottom: 10px; color: var(--ink); }
-.detail-files ul{ list-style: none; padding: 0; margin: 0 0 24px; display: flex; flex-direction: column; gap: 8px; }
+.detail-files ul{ list-style: none; padding: 0; margin: 0 0 24px; }
 .detail-files li{
   display: flex;
   align-items: center;
@@ -677,6 +677,39 @@ input[type=month]{ color-scheme: dark; }
   padding: 10px 12px;
   background: var(--bg-2);
 }
+.file-tree-folder,
+.file-tree-file{
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.file-tree-folder{ border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+.file-tree-folder summary{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: .82rem;
+  list-style: none;
+}
+.file-tree-folder summary::-webkit-details-marker{ display: none; }
+.tree-folder-icon{ color: var(--amber); transition: transform .15s ease; }
+.file-tree-folder[open] > summary .tree-folder-icon{ transform: rotate(90deg); }
+.file-tree-contents{ padding: 0 8px 8px 28px; }
+.file-tree-contents .file-tree-folder{ margin-top: 6px; }
+.file-tree-file{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+.file-tree-file .df-name{ min-width: 0; }
+.df-file-name{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .df-name{ font-family: var(--mono); font-size: .82rem; display: flex; align-items: center; gap: 8px; color: var(--ink-soft); }
 .df-ext{
   font-size: .68rem;
@@ -688,7 +721,7 @@ input[type=month]{ color-scheme: dark; }
 }
 .df-size{ font-size: .74rem; color: var(--ink-faint); }
 .detail-files a.df-download{ font-size: .8rem; text-decoration: none; font-weight: 500; color: var(--blue); }
-.detail-actions{ display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 18px; }
+.detail-actions{ display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; }
 
 /* ============================================
    TOAST
