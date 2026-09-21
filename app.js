@@ -5,6 +5,8 @@
    ===================================================================== */
 
 const API_URL = "api.php";
+const STATIC_MODE = window.location.hostname.endsWith("github.io");
+const STATIC_PROJECTS_KEY = "portfolio-projects-local";
 let currentDetailId = null;
 let filesBuffer = []; // fichiers en attente dans le formulaire d'ajout
 let adminPassword = "";
@@ -14,6 +16,7 @@ let adminAccessResolve = null;
    0. API et accès administrateur
    --------------------------------------------------------------- */
 async function apiRequest(options = {}) {
+  if (STATIC_MODE) return staticRequest(options);
   const response = await fetch(API_URL, options);
   const responseText = await response.text();
   let data;
@@ -27,7 +30,60 @@ async function apiRequest(options = {}) {
 }
 
 async function dbGetAll() {
+  if (STATIC_MODE) {
+    const stored = localStorage.getItem(STATIC_PROJECTS_KEY);
+    if (stored) return JSON.parse(stored);
+
+    const response = await fetch("data/projects.json");
+    if (!response.ok) throw new Error("Impossible de charger les projets publics.");
+    const projects = await response.json();
+    localStorage.setItem(STATIC_PROJECTS_KEY, JSON.stringify(projects));
+    return projects;
+  }
   return apiRequest();
+}
+
+async function staticRequest(options = {}) {
+  const payload = options.body;
+  if (!(payload instanceof FormData)) {
+    const request = JSON.parse(payload || "{}");
+    if (request.action === "delete") {
+      const projects = await dbGetAll();
+      const filtered = projects.filter((project) => project.id !== request.id);
+      localStorage.setItem(STATIC_PROJECTS_KEY, JSON.stringify(filtered));
+      return { ok: true };
+    }
+    return { error: "Cette action nécessite un serveur PHP." };
+  }
+
+  const projects = await dbGetAll();
+  const project = {
+    id: payload.get("id"),
+    title: payload.get("title"),
+    description: payload.get("description"),
+    tags: JSON.parse(payload.get("tags") || "[]"),
+    date: payload.get("date"),
+    link: payload.get("link"),
+    createdAt: Number(payload.get("createdAt")),
+    files: [],
+  };
+  const existing = projects.find((item) => item.id === project.id);
+  project.files = existing?.files || [];
+  for (const [key, value] of payload.entries()) {
+    if (key !== "files[]" || !(value instanceof File)) continue;
+    project.files.push({
+      name: value.name,
+      path: value.name,
+      type: value.type,
+      size: value.size,
+      url: URL.createObjectURL(value),
+    });
+  }
+  const updated = existing
+    ? projects.map((item) => (item.id === project.id ? project : item))
+    : [...projects, project];
+  localStorage.setItem(STATIC_PROJECTS_KEY, JSON.stringify(updated));
+  return { ok: true, project };
 }
 
 function requestAdminAccess() {
@@ -395,7 +451,13 @@ form.addEventListener("submit", async (e) => {
     await dbPut(project);
     closeModal();
     await renderProjects();
-    showToast(existing ? "Projet mis à jour." : "Projet ajouté au portfolio.");
+    showToast(
+      STATIC_MODE
+        ? "Projet enregistré sur ce navigateur uniquement."
+        : existing
+          ? "Projet mis à jour."
+          : "Projet ajouté au portfolio."
+    );
   } catch (err) {
     showToast(err.message);
   }
