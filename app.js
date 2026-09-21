@@ -15,7 +15,13 @@ let adminAccessResolve = null;
    --------------------------------------------------------------- */
 async function apiRequest(options = {}) {
   const response = await fetch(API_URL, options);
-  const data = await response.json();
+  const responseText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error("Le serveur PHP a refusé l'envoi. Le dossier est peut-être trop volumineux.");
+  }
   if (!response.ok || data.error) throw new Error(data.error || "Erreur serveur.");
   return data;
 }
@@ -57,22 +63,45 @@ document.getElementById("admin-overlay").addEventListener("click", (event) => {
 });
 
 async function dbPut(project) {
-  const payload = new FormData();
-  payload.append("action", "save");
-  payload.append("password", adminPassword);
-  payload.append("id", project.id);
-  payload.append("title", project.title);
-  payload.append("description", project.description);
-  payload.append("tags", JSON.stringify(project.tags));
-  payload.append("date", project.date);
-  payload.append("link", project.link);
-  payload.append("createdAt", String(project.createdAt));
+  const newFiles = project.files.filter((file) => file.blob instanceof Blob);
+  const batches = [];
+  let batch = [];
+  let batchSize = 0;
+  const maxBatchFiles = 15;
+  const maxBatchSize = 5.5 * 1024 * 1024;
 
-  project.files
-    .filter((file) => file.blob instanceof Blob)
-    .forEach((file) => payload.append("files[]", file.blob, file.name));
+  newFiles.forEach((file) => {
+    if (batch.length && (batch.length >= maxBatchFiles || batchSize + file.size > maxBatchSize)) {
+      batches.push(batch);
+      batch = [];
+      batchSize = 0;
+    }
+    batch.push(file);
+    batchSize += file.size;
+  });
+  if (batch.length || batches.length === 0) batches.push(batch);
 
-  return apiRequest({ method: "POST", body: payload });
+  let result;
+  for (const files of batches) {
+    const payload = new FormData();
+    payload.append("action", "save");
+    payload.append("password", adminPassword);
+    payload.append("id", project.id);
+    payload.append("title", project.title);
+    payload.append("description", project.description);
+    payload.append("tags", JSON.stringify(project.tags));
+    payload.append("date", project.date);
+    payload.append("link", project.link);
+    payload.append("createdAt", String(project.createdAt));
+
+    files.forEach((file) => {
+      payload.append("files[]", file.blob, file.path || file.name);
+      payload.append("paths[]", file.path || file.name);
+    });
+
+    result = await apiRequest({ method: "POST", body: payload });
+  }
+  return result;
 }
 
 async function dbDelete(id) {
@@ -213,6 +242,7 @@ const modalOverlay = document.getElementById("modal-overlay");
 const form = document.getElementById("project-form");
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("f-files");
+const folderInput = document.getElementById("f-folder");
 const fileListEl = document.getElementById("file-list");
 
 async function openModal(project = null, alreadyAuthorized = false) {
@@ -249,11 +279,44 @@ modalOverlay.addEventListener("click", (e) => {
 });
 
 /* --- zone de dépôt de fichiers (tous types : pdf, code, zip...) --- */
-dropzone.addEventListener("click", () => fileInput.click());
+document.getElementById("choose-files").addEventListener("click", () => fileInput.click());
+document.getElementById("choose-folder").addEventListener("click", chooseFolder);
 dropzone.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" || e.key === " ") fileInput.click();
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    folderInput.click();
+  }
 });
 fileInput.addEventListener("change", () => addFiles(fileInput.files));
+folderInput.addEventListener("change", () => addFiles(folderInput.files));
+
+async function chooseFolder() {
+  if (typeof window.showDirectoryPicker !== "function") {
+    folderInput.click();
+    return;
+  }
+
+  try {
+    const directory = await window.showDirectoryPicker({ mode: "read" });
+    const files = [];
+    await collectDirectoryFiles(directory, directory.name, files);
+    addFiles(files);
+  } catch (error) {
+    if (error.name !== "AbortError") showToast("Impossible de lire ce dossier.");
+  }
+}
+
+async function collectDirectoryFiles(directory, currentPath, files) {
+  for await (const entry of directory.values()) {
+    const entryPath = `${currentPath}/${entry.name}`;
+    if (entry.kind === "file") {
+      const file = await entry.getFile();
+      files.push({ file, path: entryPath });
+    } else if (entry.kind === "directory") {
+      await collectDirectoryFiles(entry, entryPath, files);
+    }
+  }
+}
 
 ["dragenter", "dragover"].forEach((evt) =>
   dropzone.addEventListener(evt, (e) => {
@@ -270,21 +333,32 @@ fileInput.addEventListener("change", () => addFiles(fileInput.files));
 dropzone.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 
 function addFiles(fileListInput) {
-  // Accepte n'importe quel type : .pdf, .js, .py, .java, .c, .cpp, .php,
-  // .html, .css, .zip, .sql, .txt, images, etc. — aucune restriction.
-  Array.from(fileListInput).forEach((file) => {
-    filesBuffer.push({ name: file.name, type: file.type, size: file.size, blob: file });
+  Array.from(fileListInput).forEach((fileEntry) => {
+    const file = fileEntry.file || fileEntry;
+    const path = fileEntry.path || file.webkitRelativePath || file.relativePath || file.name;
+    const duplicate = filesBuffer.some((existing) => existing.path === path && existing.size === file.size);
+    if (!duplicate) {
+      filesBuffer.push({
+        name: file.name,
+        path,
+        type: file.type,
+        size: file.size,
+        blob: file,
+      });
+    }
   });
   renderFileList();
   fileInput.value = "";
+  folderInput.value = "";
 }
 
 function renderFileList() {
   fileListEl.innerHTML = "";
   filesBuffer.forEach((f, i) => {
     const li = document.createElement("li");
+    const displayPath = f.path || f.name;
     li.innerHTML = `
-      <span>${escapeHTML(f.name)} · ${humanSize(f.size)}</span>
+      <span title="${escapeHTML(displayPath)}">${escapeHTML(displayPath)} · ${humanSize(f.size)}</span>
       <button type="button" class="f-remove" aria-label="Retirer ${escapeHTML(f.name)}">✕</button>
     `;
     li.querySelector(".f-remove").addEventListener("click", () => {
@@ -364,10 +438,11 @@ async function openDetail(id) {
     fileList.innerHTML = `<li><span class="df-name">Aucun fichier joint</span></li>`;
   } else {
     project.files.forEach((f) => {
-          const url = f.url;
+      const url = f.url;
+      const displayPath = f.path || f.name;
       const li = document.createElement("li");
       li.innerHTML = `
-        <span class="df-name"><span class="df-ext">${extOf(f.name)}</span> ${escapeHTML(f.name)} <span class="df-size">${humanSize(f.size)}</span></span>
+        <span class="df-name"><span class="df-ext">${extOf(f.name)}</span> ${escapeHTML(displayPath)} <span class="df-size">${humanSize(f.size)}</span></span>
         <a class="df-download" href="${url}" download="${escapeHTML(f.name)}">Télécharger</a>
       `;
       fileList.appendChild(li);

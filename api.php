@@ -52,6 +52,26 @@ function cleanName(string $name): string
     return substr($name, 0, 140);
 }
 
+function cleanRelativePath(string $path): string
+{
+    $path = str_replace('\\', '/', $path);
+    $parts = [];
+
+    foreach (explode('/', $path) as $part) {
+        $part = trim($part);
+        if ($part === '' || $part === '.' || $part === '..') continue;
+        $parts[] = cleanName($part);
+    }
+
+    return implode('/', $parts) ?: 'fichier';
+}
+
+function uploadedRelativePath(array $file, int|string $index, array $paths = []): string
+{
+    $name = $paths[$index] ?? ($file['name'][$index] ?? 'fichier');
+    return cleanRelativePath((string) $name);
+}
+
 function removeProjectFiles(array $project): void
 {
     foreach (($project['files'] ?? []) as $file) {
@@ -112,13 +132,18 @@ foreach ($all as $index => $existing) {
 }
 
 if (isset($_FILES['files']['tmp_name']) && is_array($_FILES['files']['tmp_name'])) {
+    $paths = isset($_POST['paths']) && is_array($_POST['paths']) ? $_POST['paths'] : [];
     foreach ($_FILES['files']['tmp_name'] as $index => $temporaryPath) {
         if (!is_uploaded_file($temporaryPath)) continue;
-        $originalName = cleanName((string) ($_FILES['files']['name'][$index] ?? 'fichier'));
+        // Les navigateurs fournissent le chemin relatif lorsqu’un dossier
+        // est sélectionné (webkitdirectory/directory).
+        $relativePath = uploadedRelativePath($_FILES['files'], $index, $paths);
+        $originalName = basename($relativePath);
         $storedName = bin2hex(random_bytes(8)) . '-' . $originalName;
         if (move_uploaded_file($temporaryPath, UPLOAD_DIR . DIRECTORY_SEPARATOR . $storedName)) {
             $project['files'][] = [
                 'name' => $originalName,
+                'path' => $relativePath,
                 'type' => (string) ($_FILES['files']['type'][$index] ?? 'application/octet-stream'),
                 'size' => (int) ($_FILES['files']['size'][$index] ?? 0),
                 'storedName' => $storedName,

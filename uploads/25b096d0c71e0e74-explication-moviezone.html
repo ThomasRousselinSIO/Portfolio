@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MovieZone - Explication générale</title>
+<style>
+@page { size: A4; margin: 16mm 17mm; }
+* { box-sizing: border-box; }
+body { font-family: Arial, sans-serif; color: #172033; font-size: 10.5pt; line-height: 1.42; margin: 0; }
+h1 { color: #087ea4; font-size: 25pt; margin: 0 0 4px; }
+h2 { color: #087ea4; font-size: 15pt; border-bottom: 1px solid #b8dce8; padding-bottom: 4px; margin: 18px 0 8px; }
+h3 { color: #334155; font-size: 11pt; margin: 9px 0 3px; }
+p { margin: 4px 0 7px; }
+ul { margin: 4px 0 8px 19px; padding: 0; }
+li { margin: 2px 0; }
+.subtitle { color: #64748b; font-size: 12pt; margin-bottom: 16px; }
+.intro { background: #eaf7fb; border-left: 4px solid #12a4c4; padding: 9px 12px; margin: 10px 0 14px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; }
+.box { background: #f5f8fa; border: 1px solid #dbe5ea; padding: 8px 10px; break-inside: avoid; }
+.flow { font-family: Consolas, monospace; color: #334155; background: #f8fafc; padding: 8px 10px; border: 1px solid #dbe5ea; }
+code { font-family: Consolas, monospace; color: #075985; }
+.warning { background: #fff7ed; border-left: 4px solid #f97316; padding: 8px 11px; }
+.small { color: #64748b; font-size: 9pt; }
+table { border-collapse: collapse; width: 100%; margin: 5px 0 9px; }
+th, td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; vertical-align: top; }
+th { background: #e6f4f8; color: #075985; }
+.footer { margin-top: 18px; padding-top: 7px; border-top: 1px solid #cbd5e1; color: #64748b; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+<h1>MovieZone</h1>
+<div class="subtitle">Explication générale du projet PHP</div>
+
+<div class="intro"><b>But :</b> MovieZone est une application web qui permet de gérer une collection de films, leurs réalisateurs et leurs acteurs. Elle suit une organisation MVC simple : les requêtes passent par un point d'entrée, les contrôleurs coordonnent le traitement, les modèles dialoguent avec MySQL et les vues affichent le résultat.</div>
+
+<h2>1. Fonctionnement global</h2>
+<div class="flow">Navigateur -> public/index.php -> contrôleur -> modèle PDO -> base MySQL<br>                                                -> vue PHP -> HTML affiché</div>
+<p><code>public/index.php</code> est le routeur unique. Il lit le paramètre URL <code>action</code> et appelle la bonne méthode. Sans action, la page d'accueil affiche les films.</p>
+
+<h2>2. Rôle des dossiers</h2>
+<div class="grid">
+<div class="box"><h3>config/</h3><p><code>database.php</code> ouvre la connexion PDO vers MySQL, sur la base <code>films</code>, et active les exceptions en cas d'erreur.</p></div>
+<div class="box"><h3>controllers/</h3><p>Reçoivent la requête, récupèrent les données envoyées, appellent les modèles, puis chargent une vue ou redirigent après une modification.</p></div>
+<div class="box"><h3>models/</h3><p>Contiennent les requêtes SQL et les opérations sur les films, réalisateurs, acteurs et relations entre films et acteurs.</p></div>
+<div class="box"><h3>views/</h3><p>Génèrent les pages HTML : accueil, formulaires, liste des réalisateurs et liste des acteurs. <code>partials/</code> mutualise l'en-tête et le pied de page.</p></div>
+<div class="box"><h3>public/assets/</h3><p><code>style.css</code> définit l'apparence responsive. <code>app.js</code> valide certains champs, confirme les suppressions et bascule entre URL et fichier image.</p></div>
+<div class="box"><h3>sql/</h3><p>Contient le script de création initiale de la base. Il sert de point de départ pour installer le stockage MySQL.</p></div>
+</div>
+
+<h2>3. Actions disponibles</h2>
+<table>
+<tr><th>URL / action</th><th>Résultat</th></tr>
+<tr><td><code>index.php</code></td><td>Affiche les films triés du plus récent au plus ancien.</td></tr>
+<tr><td><code>?action=add</code></td><td>Affiche le formulaire puis insère un film en POST. Une image peut venir d'une URL ou d'un upload.</td></tr>
+<tr><td><code>?action=edit&amp;id=...</code></td><td>Charge un film, puis met à jour ses informations et ses acteurs associés.</td></tr>
+<tr><td><code>?action=delete&amp;id=...</code></td><td>Supprime un film après confirmation côté navigateur.</td></tr>
+<tr><td><code>?action=realisateurs</code></td><td>Affiche les réalisateurs, triés selon la meilleure note de leurs films.</td></tr>
+<tr><td><code>?action=acteurs</code></td><td>Affiche les acteurs, avec le nombre de films et la meilleure note associée.</td></tr>
+<tr><td><code>?action=add_realisateur</code> / <code>add_acteur</code></td><td>Ajoute une personne via un formulaire POST.</td></tr>
+</table>
+
+<h2>4. Données et relations</h2>
+<p>Un film possède un titre, un genre, une année, une note sur 10, une description, une image et éventuellement un réalisateur. Les acteurs sont liés aux films par une relation plusieurs-à-plusieurs :</p>
+<div class="flow">realisateur (1) ---- (N) films (N) ---- (N) acteur<br>                                        via film_acteur</div>
+<p>Lors de l'ajout ou de la modification d'un film, <code>syncActeurs()</code> supprime les anciens liens puis recrée la liste sélectionnée. Les requêtes avec paramètres utilisent PDO préparé, ce qui limite les injections SQL.</p>
+
+<h2>5. Traitement des images</h2>
+<ul>
+<li>Si un fichier est envoyé, le contrôleur crée <code>public/assets/uploads/</code> si nécessaire, vérifie le type MIME autorisé et déplace le fichier avec un nom unique.</li>
+<li>Sinon, il enregistre le lien saisi dans <code>image_url</code>.</li>
+<li>La vue affiche ensuite cette valeur dans l'attribut <code>src</code> de l'image.</li>
+</ul>
+
+<h2>6. Points importants à connaître</h2>
+<div class="warning"><b>Schéma SQL incomplet dans le fichier fourni :</b> <code>sql/films.sql</code> crée actuellement uniquement la table <code>films</code>, sans la colonne <code>id_realisateur</code> ni les tables <code>realisateur</code>, <code>acteur</code> et <code>film_acteur</code> utilisées par le code. L'installation complète nécessite donc d'ajouter ces éléments avant d'utiliser toutes les fonctions.</div>
+<ul>
+<li>Les formulaires d'édition ne proposent pas actuellement la sélection du réalisateur ni des acteurs, même si le contrôleur et le modèle savent les enregistrer.</li>
+<li>La validation JavaScript améliore l'expérience, mais une validation serveur serait nécessaire pour sécuriser réellement les données.</li>
+<li>Les sorties HTML devraient idéalement être échappées avec <code>htmlspecialchars()</code>, notamment les titres, descriptions et URLs.</li>
+<li>La suppression passe par GET ; une action POST avec protection CSRF serait plus robuste en production.</li>
+</ul>
+
+<h2>Résumé</h2>
+<p>MovieZone est un CRUD PHP/MySQL organisé en MVC. Le routeur choisit une action, le contrôleur orchestre, le modèle exécute les requêtes et la vue affiche les données. Le cœur fonctionnel couvre les films, les personnes liées, les images et la gestion des relations film-acteur.</p>
+<div class="footer">Document généré pour le projet MovieZone · Synthèse de l'état du code observé</div>
+</body>
+</html>

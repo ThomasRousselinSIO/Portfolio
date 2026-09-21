@@ -608,6 +608,14 @@ input[type=month]{ color-scheme: dark; }
 }
 .dropzone:hover, .dropzone.drag{ border-color: var(--blue); background: var(--bg-2); }
 .dropzone p{ margin: 0; }
+.dropzone-actions{
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.dropzone-actions .btn-ghost{ padding: 8px 12px; font-size: .82rem; }
 
 .file-list{
   list-style: none;
