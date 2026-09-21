@@ -7,6 +7,17 @@
 const API_URL = "api.php";
 const STATIC_MODE = window.location.hostname.endsWith("github.io");
 const STATIC_PROJECTS_KEY = "portfolio-projects-local";
+const SUPABASE_CONFIG = window.SUPABASE_CONFIG || {};
+const SUPABASE_ENABLED = Boolean(
+  window.supabase?.createClient &&
+  SUPABASE_CONFIG.url &&
+  SUPABASE_CONFIG.anonKey &&
+  !SUPABASE_CONFIG.url.includes("TON-PROJET") &&
+  !SUPABASE_CONFIG.anonKey.includes("TA_CLE")
+);
+const supabaseClient = SUPABASE_ENABLED
+  ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+  : null;
 let currentDetailId = null;
 let filesBuffer = []; // fichiers en attente dans le formulaire d'ajout
 let adminPassword = "";
@@ -30,6 +41,14 @@ async function apiRequest(options = {}) {
 }
 
 async function dbGetAll() {
+  if (SUPABASE_ENABLED) {
+    const { data, error } = await supabaseClient
+      .from("projects")
+      .select("*")
+      .order("date", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+  }
   if (STATIC_MODE) {
     const stored = localStorage.getItem(STATIC_PROJECTS_KEY);
     if (stored) return JSON.parse(stored);
@@ -119,6 +138,8 @@ document.getElementById("admin-overlay").addEventListener("click", (event) => {
 });
 
 async function dbPut(project) {
+  if (SUPABASE_ENABLED) return supabasePut(project);
+
   const newFiles = project.files.filter((file) => file.blob instanceof Blob);
   const batches = [];
   let batch = [];
@@ -161,11 +182,54 @@ async function dbPut(project) {
 }
 
 async function dbDelete(id) {
+  if (SUPABASE_ENABLED) {
+    const project = (await dbGetAll()).find((item) => item.id === id);
+    if (project) {
+      const paths = (project.files || []).map((file) => file.storagePath).filter(Boolean);
+      if (paths.length) await supabaseClient.storage.from("project-files").remove(paths);
+    }
+    const { error } = await supabaseClient.from("projects").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  }
   return apiRequest({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "delete", id, password: adminPassword }),
   });
+}
+
+async function supabasePut(project) {
+  const files = [];
+  for (const file of project.files) {
+    if (!(file.blob instanceof Blob)) {
+      files.push(file);
+      continue;
+    }
+
+    const relativePath = file.path || file.name;
+    const storagePath = `${project.id}/${relativePath}`;
+    const { error } = await supabaseClient.storage
+      .from("project-files")
+      .upload(storagePath, file.blob, { upsert: true, contentType: file.type || undefined });
+    if (error) throw new Error(error.message);
+
+    const { data } = supabaseClient.storage.from("project-files").getPublicUrl(storagePath);
+    files.push({
+      name: file.name,
+      path: relativePath,
+      type: file.type,
+      size: file.size,
+      storagePath,
+      url: data.publicUrl,
+    });
+  }
+
+  const record = { ...project, files };
+  delete record.blob;
+  const { error } = await supabaseClient.from("projects").upsert(record);
+  if (error) throw new Error(error.message);
+  return { ok: true, project: record };
 }
 
 /* ---------------------------------------------------------------
@@ -452,8 +516,10 @@ form.addEventListener("submit", async (e) => {
     closeModal();
     await renderProjects();
     showToast(
-      STATIC_MODE
-        ? "Projet enregistré sur ce navigateur uniquement."
+      SUPABASE_ENABLED
+        ? "Projet enregistré définitivement."
+        : STATIC_MODE
+          ? "Projet enregistré sur ce navigateur uniquement."
         : existing
           ? "Projet mis à jour."
           : "Projet ajouté au portfolio."
