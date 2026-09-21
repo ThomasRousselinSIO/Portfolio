@@ -297,7 +297,7 @@ function renderFileTree(branch, parent, isRoot = true) {
 
     const download = document.createElement("a");
     download.className = "df-download";
-    download.href = file.url;
+    download.href = fileDownloadUrl(file);
     download.download = file.name;
     download.textContent = "Télécharger";
     row.appendChild(download);
@@ -316,6 +316,14 @@ function escapeHTML(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+function fileDownloadUrl(file) {
+  if (file.url && /^https?:\/\//i.test(file.url)) return file.url;
+  if (SUPABASE_ENABLED && file.storagePath) {
+    return supabaseClient.storage.from("project-files").getPublicUrl(file.storagePath).data.publicUrl;
+  }
+  return new URL(file.url || "", window.location.href).href;
 }
 
 function showToast(msg) {
@@ -529,18 +537,54 @@ function addFiles(fileListInput) {
 
 function renderFileList() {
   fileListEl.innerHTML = "";
-  filesBuffer.forEach((f, i) => {
-    const li = document.createElement("li");
-    const displayPath = f.path || f.name;
-    li.innerHTML = `
-      <span title="${escapeHTML(displayPath)}">${escapeHTML(displayPath)} · ${humanSize(f.size)}</span>
-      <button type="button" class="f-remove" aria-label="Retirer ${escapeHTML(f.name)}">✕</button>
+  fileListEl.className = "file-list upload-tree";
+  const root = { folders: new Map(), files: [] };
+
+  filesBuffer.forEach((file, index) => {
+    const parts = (file.path || file.name).split(/[\\/]/).filter(Boolean);
+    const name = parts.pop() || file.name;
+    let branch = root;
+    parts.forEach((folderName) => {
+      if (!branch.folders.has(folderName)) {
+        branch.folders.set(folderName, { folders: new Map(), files: [] });
+      }
+      branch = branch.folders.get(folderName);
+    });
+    branch.files.push({ file, index, name });
+  });
+
+  renderUploadTree(root, fileListEl, true);
+}
+
+function renderUploadTree(branch, parent, isRoot = false) {
+  [...branch.folders.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([folderName, folder]) => {
+    const item = document.createElement("li");
+    item.className = "upload-tree-folder";
+    const details = document.createElement("details");
+    details.open = isRoot;
+    const summary = document.createElement("summary");
+    summary.innerHTML = `<span class="tree-folder-icon">▸</span><span>${escapeHTML(folderName)}</span>`;
+    details.appendChild(summary);
+    const contents = document.createElement("ul");
+    contents.className = "upload-tree-contents";
+    renderUploadTree(folder, contents);
+    details.appendChild(contents);
+    item.appendChild(details);
+    parent.appendChild(item);
+  });
+
+  branch.files.sort((a, b) => a.name.localeCompare(b.name)).forEach(({ file, index, name }) => {
+    const item = document.createElement("li");
+    item.className = "upload-tree-file";
+    item.innerHTML = `
+      <span title="${escapeHTML(file.path || name)}"><span class="df-ext">${escapeHTML(extOf(name))}</span> ${escapeHTML(name)} · ${humanSize(file.size)}</span>
+      <button type="button" class="f-remove" aria-label="Retirer ${escapeHTML(name)}">✕</button>
     `;
-    li.querySelector(".f-remove").addEventListener("click", () => {
-      filesBuffer.splice(i, 1);
+    item.querySelector(".f-remove").addEventListener("click", () => {
+      filesBuffer.splice(index, 1);
       renderFileList();
     });
-    fileListEl.appendChild(li);
+    parent.appendChild(item);
   });
 }
 
@@ -654,8 +698,10 @@ document.getElementById("detail-download-all").addEventListener("click", async (
   try {
     const archive = new window.JSZip();
     for (const file of project.files) {
-      const response = await fetch(file.url);
-      if (!response.ok) throw new Error(`Impossible de récupérer ${file.name}.`);
+      const response = await fetch(fileDownloadUrl(file));
+      if (!response.ok) {
+        throw new Error(`Impossible de récupérer ${file.name}. Réimporte ce fichier dans le projet.`);
+      }
       archive.file(file.path || file.name, await response.blob());
     }
 
@@ -664,8 +710,10 @@ document.getElementById("detail-download-all").addEventListener("click", async (
     const link = document.createElement("a");
     link.href = downloadUrl;
     link.download = `${project.title || "projet"}.zip`.replace(/[^A-Za-z0-9._-]/g, "_");
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(downloadUrl);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
     showToast("Archive téléchargée.");
   } catch (error) {
     showToast(error.message || "Impossible de créer l’archive.");
